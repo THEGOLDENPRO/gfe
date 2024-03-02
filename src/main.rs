@@ -1,7 +1,7 @@
-use std::{io::ErrorKind, sync::Arc};
+use std::{fmt::format, io::ErrorKind, path::PathBuf, sync::Arc};
 
-use files::pick_file;
-use iced::{alignment::Horizontal, executor, theme, widget::{self, text_editor::{Action, Content}}, Application, Command, Length, Sandbox, Settings, Theme};
+use files::{pick_file};
+use iced::{alignment::Horizontal, executor, theme, widget::{self, text_editor::{Action, Content}}, Application, Command, Font, Length, Sandbox, Settings, Theme};
 use styles::text_box::TextBoxStyle;
 
 mod files;
@@ -11,7 +11,7 @@ mod styles;
 enum Message {
     Edit(Action),
     Open,
-    FileOpened(Result<Arc<String>, GFEError>)
+    FileOpened(Result<(PathBuf, Arc<String>), GFEError>)
 }
 
 #[derive(Debug, Clone)]
@@ -26,6 +26,7 @@ fn main() -> iced::Result {
 
 struct Editor {
     content: Content,
+    path: Option<PathBuf>,
     error: Option<GFEError>
 }
 
@@ -38,7 +39,8 @@ impl Application for Editor {
     fn new(flags: Self::Flags) -> (Self, Command<Message>) {
         (
             Self {
-                content: Content::with_text("Hewwo, type your text here or open a file. :)"),
+                path: None, 
+                content: Content::with_text("Hewwo, type your text here or open a file. :)"), 
                 error: None
             },
             Command::none()
@@ -46,7 +48,14 @@ impl Application for Editor {
     }
 
     fn title(&self) -> String {
-        String::from("GFE")
+        match &self.path {
+            Some(value) => {
+                String::from(format!("GFE - {}", value.file_name().unwrap().to_str().unwrap()))
+            }
+            None => {
+                String::from("GFE")
+            }
+        }
     }
 
     fn update(&mut self, message: Self::Message) -> Command<Message> {
@@ -57,10 +66,11 @@ impl Application for Editor {
             },
             Message::Open => {
                 Command::perform(pick_file(),Message::FileOpened)
-            }
+            },
             Message::FileOpened(result) => {
                 match result {
-                    Ok(content) => {
+                    Ok((path, content)) => {
+                        self.path = Some(path);
                         self.content = Content::with_text(&content);
                     }
                     Err(error) => {
@@ -81,7 +91,17 @@ impl Application for Editor {
         let input_box = widget::text_editor(&self.content)
             .on_action(Message::Edit)
             .style(theme::TextEditor::Custom(Box::new( TextBoxStyle { theme: self.theme() } )))
+            .font(Font::MONOSPACE)
             .height(Length::Fill);
+
+        let path_indictor = match &self.path {
+            Some(value) => {
+                widget::text(value.to_str().unwrap())
+            },
+            None => {
+                widget::text("")
+            }
+        };
 
         let cursor_position = {
             let (line, column) = self.content.cursor_position();
@@ -89,8 +109,8 @@ impl Application for Editor {
             widget::text(format!("{}:{}", line + 1, column + 1)).horizontal_alignment(Horizontal::Left)
         };
 
-        let bottom_panel = widget::row![widget::horizontal_space(), cursor_position]
-            .padding([0, 10]);
+        let bottom_panel = widget::row![path_indictor, widget::horizontal_space(), cursor_position]
+            .padding([0, 5]);
 
         widget::container(widget::column![top_panel, input_box, bottom_panel].spacing(10))
             .padding(15)
