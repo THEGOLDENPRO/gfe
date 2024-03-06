@@ -1,7 +1,7 @@
-use std::{fmt::format, io::ErrorKind, path::PathBuf, sync::Arc};
+use std::{env, fs, io::ErrorKind, path::{Path, PathBuf}, sync::Arc};
 
-use files::{pick_file};
-use iced::{alignment::Horizontal, executor, theme, widget::{self, text_editor::{Action, Content}}, Application, Command, Font, Length, Sandbox, Settings, Theme};
+use files::pick_file;
+use iced::{alignment::Horizontal, executor, theme, widget::{self, text_editor::{Action, Content}}, Application, Command, Font, Length, Settings, Theme};
 use styles::text_box::TextBoxStyle;
 
 mod files;
@@ -37,10 +37,29 @@ impl Application for Editor {
     type Flags = ();
 
     fn new(flags: Self::Flags) -> (Self, Command<Message>) {
+        let cli_args: Vec<String> = env::args().collect();
+
+        let file_path = cli_args.get(1);
+
         (
             Self {
                 path: None, 
-                content: Content::with_text("Hewwo, type your text here or open a file. :)"), 
+                content: match file_path {
+                    Some(path_string) => {
+                        let path = Path::new(path_string);
+
+                        if !path.exists() {
+                            fs::write(path, "").expect(
+                                "Tried creating a file that didn't exist but failed to do so."
+                            );
+                        }
+
+                        Content::with_text(fs::read_to_string(path).expect("Failed to read file!").as_str())
+                    },
+                    None => {
+                        Content::with_text("Hewwo, type your text here or open a file. :)")
+                    }
+                },
                 error: None
             },
             Command::none()
