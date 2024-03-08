@@ -1,7 +1,7 @@
 use std::{env, fs, io::ErrorKind, path::{Path, PathBuf}, sync::Arc};
 
-use files::pick_file;
-use iced::{alignment::Horizontal, executor, theme, widget::{self, text_editor::{Action, Content}}, Application, Command, Font, Length, Settings, Theme};
+use files::{load_file, pick_file};
+use iced::{alignment::Horizontal, event, executor, keyboard::{self, Key}, theme, widget::{self, text_editor::{Action, Content}}, Application, Command, Event, Font, Length, Settings, Subscription, Theme};
 use styles::text_box::TextBoxStyle;
 
 mod files;
@@ -9,9 +9,10 @@ mod styles;
 
 #[derive(Debug, Clone)]
 enum Message {
-    Edit(Action),
-    Open,
-    FileOpened(Result<(PathBuf, Arc<String>), GFEError>)
+    Open, 
+    FileOpened(Result<(PathBuf, Arc<String>), GFEError>), 
+    Edit(Action), 
+    Event(Event)
 }
 
 #[derive(Debug, Clone)]
@@ -36,33 +37,35 @@ impl Application for Editor {
     type Theme = Theme;
     type Flags = ();
 
-    fn new(flags: Self::Flags) -> (Self, Command<Message>) {
+    fn new(_flags: Self::Flags) -> (Self, Command<Message>) {
         let cli_args: Vec<String> = env::args().collect();
 
         let file_path = cli_args.get(1);
 
+        let initial_command = match file_path {
+            Some(path_string) => {
+                let path = Path::new(path_string);
+
+                if !path.exists() {
+                    fs::write(path, "").expect(
+                        "Tried creating a file that didn't exist but failed to do so."
+                    );
+                }
+
+                Command::perform(load_file(path.to_path_buf()), Message::FileOpened)
+            },
+            None => {
+                Command::none()
+            }
+        };
+
         (
             Self {
                 path: None, 
-                content: match file_path {
-                    Some(path_string) => {
-                        let path = Path::new(path_string);
-
-                        if !path.exists() {
-                            fs::write(path, "").expect(
-                                "Tried creating a file that didn't exist but failed to do so."
-                            );
-                        }
-
-                        Content::with_text(fs::read_to_string(path).expect("Failed to read file!").as_str())
-                    },
-                    None => {
-                        Content::with_text("Hewwo, type your text here or open a file. :)")
-                    }
-                },
+                content: Content::with_text("Hewwo, type your text here or open a file. :)"),
                 error: None
             },
-            Command::none()
+            initial_command
         )
     }
 
@@ -75,6 +78,10 @@ impl Application for Editor {
                 String::from("GFE")
             }
         }
+    }
+
+    fn subscription(&self) -> Subscription<Message> {
+        event::listen().map(Message::Event)
     }
 
     fn update(&mut self, message: Self::Message) -> Command<Message> {
@@ -98,6 +105,20 @@ impl Application for Editor {
                 }
 
                 Command::none()
+            },
+            Message::Event(event) => match event {
+                Event::Keyboard(
+                    keyboard::Event::KeyPressed {key, modifiers, ..}
+                ) => {
+
+                    if key == Key::Character("a".into()) && modifiers.control() {
+                        self.content.perform(Action::Move(widget::text_editor::Motion::DocumentStart));
+                        self.content.perform(Action::Select(widget::text_editor::Motion::DocumentEnd));
+                    }
+
+                    Command::none()
+                },
+                _ => Command::none()
             }
         }
     }

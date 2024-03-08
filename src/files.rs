@@ -1,7 +1,7 @@
-use std::{path::{PathBuf}, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
-use rfd::{AsyncFileDialog};
 use tokio::fs;
+use rfd::AsyncFileDialog;
 
 use crate::GFEError;
 
@@ -14,7 +14,7 @@ pub async fn pick_file() -> Result<(PathBuf, Arc<String>), GFEError> {
     load_file(file_handle.path().to_owned()).await
 }
 
-async fn load_file(path: PathBuf) -> Result<(PathBuf, Arc<String>), GFEError> {
+pub async fn load_file(path: PathBuf) -> Result<(PathBuf, Arc<String>), GFEError> {
     let contents = fs::read_to_string(&path)
         .await
         .map(Arc::new)

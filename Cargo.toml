@@ -9,3 +9,4 @@ edition = "2021"
 iced = {version = "0.12.1", features = ["tokio", "debug"]}
 tokio = {version = "1.36.0", features = ["fs"]}
 rfd = "0.14.0"
+smol_str = "0.2.1"
