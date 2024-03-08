@@ -1,5 +1,6 @@
 use std::{path::PathBuf, sync::Arc};
 
+use iced::widget::text_editor::Content;
 use tokio::fs;
 use rfd::AsyncFileDialog;
 
@@ -22,4 +23,13 @@ pub async fn load_file(path: PathBuf) -> Result<(PathBuf, Arc<String>), GFEError
         .map_err(GFEError::IO)?;
 
     Ok((path, contents))
+}
+
+pub async fn save_file(path: PathBuf, contents: String) -> Result<(), GFEError> {
+    fs::write(&path, contents)
+        .await
+        .map_err(|error| error.kind())
+        .map_err(GFEError::IO)?;
+
+    Ok(())
 }

@@ -1,7 +1,7 @@
 use std::{env, fs, io::ErrorKind, path::{Path, PathBuf}, sync::Arc};
 
-use files::{load_file, pick_file};
-use iced::{alignment::Horizontal, event, executor, keyboard::{self, Key}, theme, widget::{self, text_editor::{Action, Content}}, Application, Command, Event, Font, Length, Settings, Subscription, Theme};
+use files::{load_file, pick_file, save_file};
+use iced::{alignment::Horizontal, executor, keyboard::{self}, theme, widget::{self, text_editor::{Action, Content}}, Application, Command, Font, Length, Settings, Subscription, Theme};
 use styles::text_box::TextBoxStyle;
 
 mod files;
@@ -11,8 +11,11 @@ mod styles;
 enum Message {
     Open, 
     FileOpened(Result<(PathBuf, Arc<String>), GFEError>), 
+    FileSaved(Result<(), GFEError>), 
+
+    Save, 
     Edit(Action), 
-    Event(Event)
+    SelectAll
 }
 
 #[derive(Debug, Clone)]
@@ -81,7 +84,15 @@ impl Application for Editor {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        event::listen().map(Message::Event)
+        keyboard::on_key_press(|key, modifiers| match key.as_ref() {
+            keyboard::Key::Character("s") if modifiers.command() => {
+                Some(Message::Save)
+            },
+            keyboard::Key::Character("a") if modifiers.command() => {
+                Some(Message::SelectAll)
+            },
+            _ => None,
+        })
     }
 
     fn update(&mut self, message: Self::Message) -> Command<Message> {
@@ -93,6 +104,19 @@ impl Application for Editor {
             Message::Open => {
                 Command::perform(pick_file(),Message::FileOpened)
             },
+            Message::Save => {
+                Command::perform(save_file(self.path.clone().unwrap(), self.content.text()), Message::FileSaved)
+            },
+            Message::FileSaved(result) => {
+                match result {
+                    Err(error) => {
+                        self.error = Some(error)
+                    },
+                    _ => {}
+                }
+
+                Command::none()
+            }
             Message::FileOpened(result) => {
                 match result {
                     Ok((path, content)) => {
@@ -106,19 +130,10 @@ impl Application for Editor {
 
                 Command::none()
             },
-            Message::Event(event) => match event {
-                Event::Keyboard(
-                    keyboard::Event::KeyPressed {key, modifiers, ..}
-                ) => {
-
-                    if key == Key::Character("a".into()) && modifiers.control() {
-                        self.content.perform(Action::Move(widget::text_editor::Motion::DocumentStart));
-                        self.content.perform(Action::Select(widget::text_editor::Motion::DocumentEnd));
-                    }
-
-                    Command::none()
-                },
-                _ => Command::none()
+            Message::SelectAll => {
+                self.content.perform(Action::Move(widget::text_editor::Motion::DocumentStart));
+                self.content.perform(Action::Select(widget::text_editor::Motion::DocumentEnd));
+                Command::none()
             }
         }
     }
