@@ -1,11 +1,13 @@
 use std::{env, fs, io::ErrorKind, path::{Path, PathBuf}, sync::Arc};
 
+use circle::circle;
 use files::{load_file, pick_file, save_file};
 use iced::{alignment::Horizontal, executor, keyboard::{self}, theme, widget::{self, text_editor::{Action, Content}}, Application, Command, Font, Length, Settings, Subscription, Theme};
 use styles::text_box::TextBoxStyle;
 
 mod files;
 mod styles;
+mod circle;
 
 #[derive(Debug, Clone)]
 enum Message {
@@ -31,6 +33,7 @@ fn main() -> iced::Result {
 struct Editor {
     content: Content,
     path: Option<PathBuf>,
+    saved: bool,
     error: Option<GFEError>
 }
 
@@ -66,6 +69,7 @@ impl Application for Editor {
             Self {
                 path: None, 
                 content: Content::with_text("Hewwo, type your text here or open a file. :)"),
+                saved: false,
                 error: None
             },
             initial_command
@@ -98,6 +102,13 @@ impl Application for Editor {
     fn update(&mut self, message: Self::Message) -> Command<Message> {
         match message {
             Message::Edit(action) => {
+                match action {
+                    Action::Edit(_) => {
+                        self.saved = false;
+                    },
+                    _ => {}
+                }
+
                 self.content.perform(action);
                 Command::none()
             },
@@ -105,7 +116,11 @@ impl Application for Editor {
                 Command::perform(pick_file(),Message::FileOpened)
             },
             Message::Save => {
-                Command::perform(save_file(self.path.clone().unwrap(), self.content.text()), Message::FileSaved)
+                if self.path.is_some() {
+                    return Command::perform(save_file(self.path.clone().unwrap(), self.content.text()), Message::FileSaved);
+                }
+
+                Command::none()
             },
             Message::FileSaved(result) => {
                 match result {
@@ -115,11 +130,14 @@ impl Application for Editor {
                     _ => {}
                 }
 
+                self.saved = true;
+
                 Command::none()
             }
             Message::FileOpened(result) => {
                 match result {
                     Ok((path, content)) => {
+                        self.saved = true;
                         self.path = Some(path);
                         self.content = Content::with_text(&content);
                     }
@@ -140,7 +158,8 @@ impl Application for Editor {
 
     fn view(&self) -> iced::Element<'_, Self::Message> {
         let top_panel = widget::row![
-            widget::button("Open File").on_press(Message::Open)
+            widget::button("Open").padding(3).on_press(Message::Open),
+            widget::horizontal_space()
         ];
 
         let input_box = widget::text_editor(&self.content)
@@ -148,6 +167,11 @@ impl Application for Editor {
             .style(theme::TextEditor::Custom(Box::new( TextBoxStyle { theme: self.theme() } )))
             .font(Font::MONOSPACE)
             .height(Length::Fill);
+
+        let unsaved_indictor = match self.saved {
+            true => widget::container(circle(0.0)),
+            false => widget::container(circle(10.0)).padding([0, 6, 0, 0])
+        };
 
         let path_indictor = match &self.path {
             Some(value) => {
@@ -164,12 +188,18 @@ impl Application for Editor {
             widget::text(format!("{}:{}", line + 1, column + 1)).horizontal_alignment(Horizontal::Left)
         };
 
-        let bottom_panel = widget::row![path_indictor, widget::horizontal_space(), cursor_position]
-            .padding([0, 5]);
+        let bottom_panel = widget::row![
+            unsaved_indictor, 
+            path_indictor, 
+            widget::horizontal_space(), 
+            cursor_position
+        ].padding([0, 5]);
 
-        widget::container(widget::column![top_panel, input_box, bottom_panel].spacing(10))
-            .padding(15)
-            .into()
+        widget::container(
+            widget::column![top_panel, input_box, bottom_panel].spacing(10)
+        )
+        .padding(15)
+        .into()
     }
 
     fn theme(&self) -> Theme {
