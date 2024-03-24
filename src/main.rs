@@ -1,5 +1,6 @@
 use std::{env, fs, io::ErrorKind, path::{Path, PathBuf}, sync::Arc};
 
+use modal::Modal;
 use circle::circle;
 use files::{load_file, pick_file, save_file};
 use iced::{alignment::Horizontal, executor, keyboard::{self}, theme, widget::{self, text_editor::{Action, Content}}, Application, Command, Font, Length, Settings, Subscription, Theme};
@@ -8,6 +9,7 @@ use styles::text_box::TextBoxStyle;
 mod files;
 mod styles;
 mod circle;
+mod modal;
 
 #[derive(Debug, Clone)]
 enum Message {
@@ -15,9 +17,11 @@ enum Message {
     FileOpened(Result<(PathBuf, Arc<String>), GFEError>), 
     FileSaved(Result<(), GFEError>), 
 
+    ShowModal,
+
     Save, 
     Edit(Action), 
-    SelectAll
+    SelectAll,
 }
 
 #[derive(Debug, Clone)]
@@ -34,6 +38,7 @@ struct Editor {
     content: Content,
     path: Option<PathBuf>,
     saved: bool,
+    show_modal: bool,
     error: Option<GFEError>
 }
 
@@ -68,8 +73,9 @@ impl Application for Editor {
         (
             Self {
                 path: None, 
-                content: Content::with_text("Hewwo, type your text here or open a file. :)"),
-                saved: false,
+                content: Content::with_text("Hewwo, type your text here or open a file. :)"), 
+                saved: false, 
+                show_modal: false, 
                 error: None
             },
             initial_command
@@ -89,6 +95,9 @@ impl Application for Editor {
 
     fn subscription(&self) -> Subscription<Message> {
         keyboard::on_key_press(|key, modifiers| match key.as_ref() {
+            _ if modifiers.command() => {
+                Some(Message::ShowModal)
+            },
             keyboard::Key::Character("s") if modifiers.command() => {
                 Some(Message::Save)
             },
@@ -152,16 +161,15 @@ impl Application for Editor {
                 self.content.perform(Action::Move(widget::text_editor::Motion::DocumentStart));
                 self.content.perform(Action::Select(widget::text_editor::Motion::DocumentEnd));
                 Command::none()
+            },
+            Message::ShowModal => {
+                self.show_modal = true;
+                Command::none()
             }
         }
     }
 
     fn view(&self) -> iced::Element<'_, Self::Message> {
-        let top_panel = widget::row![
-            widget::button("Open").padding(3).on_press(Message::Open),
-            widget::horizontal_space()
-        ];
-
         let input_box = widget::text_editor(&self.content)
             .on_action(Message::Edit)
             .style(theme::TextEditor::Custom(Box::new( TextBoxStyle { theme: self.theme() } )))
@@ -195,11 +203,24 @@ impl Application for Editor {
             cursor_position
         ].padding([0, 5]);
 
-        widget::container(
-            widget::column![top_panel, input_box, bottom_panel].spacing(10)
+        let content = widget::container(
+            widget::column![input_box, bottom_panel].spacing(10)
         )
-        .padding(15)
-        .into()
+        .padding(15);
+
+        let modal = widget::container(
+            widget::row![
+                widget::button("Open").on_press(Message::Open),
+                widget::button("Save").on_press(Message::Save),
+            ].spacing(10)
+        ).padding(10);
+
+        if self.show_modal {
+            Modal::new(content, modal).into()
+        } else {
+            content.into()
+        }
+
     }
 
     fn theme(&self) -> Theme {

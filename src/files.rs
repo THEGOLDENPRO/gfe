@@ -1,6 +1,5 @@
 use std::{path::PathBuf, sync::Arc};
 
-use iced::widget::text_editor::Content;
 use tokio::fs;
 use rfd::AsyncFileDialog;
 
