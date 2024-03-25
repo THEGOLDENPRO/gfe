@@ -38,7 +38,7 @@ struct Editor {
     content: Content,
     path: Option<PathBuf>,
     saved: bool,
-    show_command_pallet: bool,
+    show_control_pallet: bool,
     error: Option<GFEError>
 }
 
@@ -75,7 +75,7 @@ impl Application for Editor {
                 path: None, 
                 content: Content::with_text("Hewwo, type your text here or open a file. :)"), 
                 saved: false, 
-                show_command_pallet: false, 
+                show_control_pallet: false, 
                 error: None
             },
             initial_command
@@ -94,7 +94,7 @@ impl Application for Editor {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        if self.show_command_pallet == true {
+        if self.show_control_pallet == true {
             keyboard::on_key_release(|key, _| match key.as_ref() {
                 keyboard::Key::Character("o") => {
                     Some(Message::Open)
@@ -121,8 +121,8 @@ impl Application for Editor {
     }
 
     fn update(&mut self, message: Self::Message) -> Command<Message> {
-        if self.show_command_pallet == true {
-            self.show_command_pallet = false;
+        if self.show_control_pallet == true {
+            self.show_control_pallet = false;
             println!("OMG 727!!!");
             return self.update(message)
         }
@@ -182,7 +182,7 @@ impl Application for Editor {
                 Command::none()
             },
             Message::ToggleModal(value) => {
-                self.show_command_pallet = value;
+                self.show_control_pallet = value;
                 Command::none()
             }
         }
@@ -240,7 +240,7 @@ impl Application for Editor {
             ].spacing(10)
         ).padding(10);
 
-        if self.show_command_pallet {
+        if self.show_control_pallet {
             Modal::new(content, modal).into()
         } else {
             content.into()
