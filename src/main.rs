@@ -3,7 +3,7 @@ use std::{env, fs, io::ErrorKind, path::{Path, PathBuf}, sync::Arc};
 use modal::Modal;
 use circle::circle;
 use files::{load_file, pick_file, save_file};
-use iced::{alignment::Horizontal, executor, keyboard::{self}, theme, widget::{self, text_editor::{Action, Content}}, Application, Command, Font, Length, Settings, Subscription, Theme};
+use iced::{alignment::Horizontal, executor, keyboard, theme, widget::{self, text_editor::{Action, Content}}, Alignment, Application, Command, Font, Length, Settings, Subscription, Theme};
 use styles::text_box::TextBoxStyle;
 
 mod files;
@@ -17,7 +17,7 @@ enum Message {
     FileOpened(Result<(PathBuf, Arc<String>), GFEError>), 
     FileSaved(Result<(), GFEError>), 
 
-    ShowModal,
+    ToggleModal(bool),
 
     Save, 
     Edit(Action), 
@@ -38,7 +38,7 @@ struct Editor {
     content: Content,
     path: Option<PathBuf>,
     saved: bool,
-    show_modal: bool,
+    show_command_pallet: bool,
     error: Option<GFEError>
 }
 
@@ -75,7 +75,7 @@ impl Application for Editor {
                 path: None, 
                 content: Content::with_text("Hewwo, type your text here or open a file. :)"), 
                 saved: false, 
-                show_modal: false, 
+                show_command_pallet: false, 
                 error: None
             },
             initial_command
@@ -94,21 +94,39 @@ impl Application for Editor {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        keyboard::on_key_press(|key, modifiers| match key.as_ref() {
-            _ if modifiers.command() => {
-                Some(Message::ShowModal)
-            },
-            keyboard::Key::Character("s") if modifiers.command() => {
-                Some(Message::Save)
-            },
-            keyboard::Key::Character("a") if modifiers.command() => {
-                Some(Message::SelectAll)
-            },
-            _ => None,
-        })
+        if self.show_command_pallet == true {
+            keyboard::on_key_release(|key, _| match key.as_ref() {
+                keyboard::Key::Character("o") => {
+                    Some(Message::Open)
+                },
+                keyboard::Key::Character("s") => {
+                    Some(Message::Save)
+                },
+                keyboard::Key::Character("a") => {
+                    Some(Message::SelectAll)
+                },
+                keyboard::Key::Named(keyboard::key::Named::Control) => {
+                    Some(Message::ToggleModal(false))
+                },
+                _ => None
+            })
+        } else {
+            keyboard::on_key_press(|key, _| match key.as_ref() {
+                keyboard::Key::Named(keyboard::key::Named::Control) => {
+                    Some(Message::ToggleModal(true))
+                },
+                _ => None
+            })
+        }
     }
 
     fn update(&mut self, message: Self::Message) -> Command<Message> {
+        if self.show_command_pallet == true {
+            self.show_command_pallet = false;
+            println!("OMG 727!!!");
+            return self.update(message)
+        }
+
         match message {
             Message::Edit(action) => {
                 match action {
@@ -160,10 +178,11 @@ impl Application for Editor {
             Message::SelectAll => {
                 self.content.perform(Action::Move(widget::text_editor::Motion::DocumentStart));
                 self.content.perform(Action::Select(widget::text_editor::Motion::DocumentEnd));
+                println!("HOW!!!");
                 Command::none()
             },
-            Message::ShowModal => {
-                self.show_modal = true;
+            Message::ToggleModal(value) => {
+                self.show_command_pallet = value;
                 Command::none()
             }
         }
@@ -210,12 +229,18 @@ impl Application for Editor {
 
         let modal = widget::container(
             widget::row![
-                widget::button("Open").on_press(Message::Open),
-                widget::button("Save").on_press(Message::Save),
+                widget::column![
+                    widget::button("Open").padding([5, 10]).on_press(Message::Open),
+                    widget::text("(CTRL + O)").size(12)
+                ].spacing(5).align_items(Alignment::Center),
+                widget::column![
+                    widget::button("Save").padding([5, 10]).on_press(Message::Save),
+                    widget::text("(CTRL + S)").size(12)
+                ].spacing(5).align_items(Alignment::Center),
             ].spacing(10)
         ).padding(10);
 
-        if self.show_modal {
+        if self.show_command_pallet {
             Modal::new(content, modal).into()
         } else {
             content.into()
