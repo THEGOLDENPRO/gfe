@@ -123,7 +123,6 @@ impl Application for Editor {
     fn update(&mut self, message: Self::Message) -> Command<Message> {
         if self.show_control_pallet == true {
             self.show_control_pallet = false;
-            println!("OMG 727!!!");
             return self.update(message)
         }
 
